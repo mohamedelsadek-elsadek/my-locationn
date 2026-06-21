@@ -151,6 +151,11 @@
     <div class="field"><label>اسم المكان</label><input id="fName" placeholder="مثال: مطعم الأصيل"></div>
     <div class="field"><label>التصنيف</label><select id="fCat"></select></div>
     <div class="field"><label>الوصف</label><textarea id="fDesc" placeholder="تفاصيل عن المكان…"></textarea></div>
+    <div class="field">
+      <label>📲 الصق لينك جوجل مابس (من الواتساب)</label>
+      <input id="fLink" placeholder="الصق اللينك هنا وسيُستخرج الموقع تلقائيًا">
+      <div class="loc-hint" id="linkHint" style="text-align:right"></div>
+    </div>
     <div class="row">
       <div class="field"><label>خط العرض (lat)</label><input id="fLat" inputmode="decimal" placeholder="30.0444"></div>
       <div class="field"><label>خط الطول (lng)</label><input id="fLng" inputmode="decimal" placeholder="31.2357"></div>
@@ -470,6 +475,7 @@ function openForm(id){
   editingId=id||null;
   $('formTitle').textContent=id?'تعديل مكان':'إضافة مكان';
   $('locHint').innerHTML='أو اضغط على الخريطة لتحديد الموقع يدويًا';
+  $('fLink').value=''; $('linkHint').textContent='';
   if(id){const p=places.find(x=>x.id===id);$('fName').value=p.name;$('fCat').value=p.cat;$('fDesc').value=p.desc||'';$('fLat').value=p.lat??'';$('fLng').value=p.lng??'';}
   else {$('fName').value='';$('fCat').value=categories[0]?.id||'';$('fDesc').value='';$('fLat').value='';$('fLng').value='';}
   $('formModal').classList.add('open'); closeSheetFn();
@@ -500,6 +506,45 @@ function openDetail(id){
   $('dMeta').innerHTML=`${c.emoji} ${esc(c.name)} &nbsp;·&nbsp; ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
   $('dDesc').textContent=p.desc||'لا يوجد وصف';
   $('detailModal').classList.add('open');
+}
+
+/* ---------- استخراج الموقع من لينك جوجل مابس ---------- */
+function parseMapLink(url){
+  if(!url) return null;
+  url=url.trim();
+  // أنماط شائعة لإحداثيات جوجل مابس
+  const patterns=[
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,                 // .../@30.594,31.487,15z
+    /[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,          // ...?q=30.594,31.487
+    /[?&]ll=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,         // ...?ll=30.594,31.487
+    /[?&]daddr=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,      // اتجاهات
+    /destination=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,    // dir destination
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,              // صيغة المكان الداخلية
+    /(-?\d{1,3}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})/,  // أي رقمين إحداثيات مفصولين بفاصلة
+  ];
+  for(const re of patterns){
+    const m=url.match(re);
+    if(m){
+      const lat=parseFloat(m[1]), lng=parseFloat(m[2]);
+      if(!isNaN(lat)&&!isNaN(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180) return {lat,lng};
+    }
+  }
+  return null;
+}
+function handleLinkInput(){
+  const v=$('fLink').value;
+  const hint=$('linkHint');
+  if(!v.trim()){ hint.textContent=''; return; }
+  const r=parseMapLink(v);
+  if(r){
+    $('fLat').value=r.lat.toFixed(6); $('fLng').value=r.lng.toFixed(6);
+    hint.innerHTML='<span class="loc-ok">✓ تم استخراج الموقع من اللينك</span>';
+    $('locHint').innerHTML='<span class="loc-ok">✓ الموقع جاهز من لينك جوجل مابس</span>';
+  } else if(/goo\.gl|app\.goo\.gl/.test(v)){
+    hint.innerHTML='⚠️ اللينك مختصر. افتحه في جوجل مابس وانسخ اللينك الكامل (اللي فيه أرقام)، أو انسخ الإحداثيات يدويًا.';
+  } else {
+    hint.innerHTML='لم أجد إحداثيات في اللينك. تأكد إنه لينك جوجل مابس فيه موقع.';
+  }
 }
 
 /* ---------- GPS ---------- */
@@ -535,6 +580,8 @@ function closeAll(){document.querySelectorAll('.modal').forEach(m=>m.classList.r
 $('addBtn').onclick=()=>openForm();
 $('cancelForm').onclick=closeForm; $('cancelForm2').onclick=closeForm; $('saveForm').onclick=saveForm;
 $('useGps').onclick=useGps; $('locateBtn').onclick=locateMe;
+$('fLink').oninput=handleLinkInput;
+$('fLink').onpaste=()=>setTimeout(handleLinkInput,50);
 $('listToggle').onclick=openSheetFn; $('closeSheet').onclick=closeSheetFn;
 $('dClose').onclick=()=>$('detailModal').classList.remove('open');
 $('dEdit').onclick=()=>{$('detailModal').classList.remove('open');openForm(detailId);};
