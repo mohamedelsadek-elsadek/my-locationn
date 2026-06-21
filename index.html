@@ -177,6 +177,11 @@
     <div class="detail-desc" id="dDesc"></div>
     <div class="detail-actions">
       <button class="btn btn-primary" id="dRoute">🧭 الاتجاهات</button>
+      <button class="btn btn-ghost" id="dShare">📤 مشاركة</button>
+    </div>
+    <div class="detail-actions" style="margin-top:10px">
+      <button class="btn btn-ghost" id="dWhats" style="background:#075e54;color:#fff;border:none">واتساب</button>
+      <button class="btn btn-ghost" id="dMsg" style="background:#0084ff;color:#fff;border:none">ماسنجر</button>
       <button class="btn btn-ghost" id="dEdit">تعديل</button>
     </div>
     <div class="btns"><button class="btn btn-danger" id="dDelete">حذف</button></div>
@@ -587,6 +592,29 @@ $('dClose').onclick=()=>$('detailModal').classList.remove('open');
 $('dEdit').onclick=()=>{$('detailModal').classList.remove('open');openForm(detailId);};
 $('dDelete').onclick=()=>{if(confirm('متأكد من حذف المكان؟')){deletePlace(detailId);$('detailModal').classList.remove('open');}};
 $('dRoute').onclick=()=>{const p=places.find(x=>x.id===detailId);window.open(`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`,'_blank');};
+
+/* ---------- المشاركة ---------- */
+function shareText(){
+  const p=places.find(x=>x.id===detailId); if(!p)return null;
+  const c=catById(p.cat);
+  const link=`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
+  let t=`📍 ${p.name}`;
+  t+=`\n${c.emoji} ${c.name}`;
+  if(p.desc) t+=`\n${p.desc}`;
+  t+=`\n\n${link}`;
+  return {text:t, name:p.name};
+}
+$('dShare').onclick=async()=>{
+  const s=shareText(); if(!s)return;
+  if(navigator.share){
+    try{ await navigator.share({title:s.name, text:s.text}); }catch(e){}
+  } else {
+    try{ await navigator.clipboard.writeText(s.text); alert('تم نسخ المكان ✓ الزقه في أي محادثة'); }
+    catch(e){ prompt('انسخ النص ده وابعته:', s.text); }
+  }
+};
+$('dWhats').onclick=()=>{ const s=shareText(); if(s) window.open('https://wa.me/?text='+encodeURIComponent(s.text),'_blank'); };
+$('dMsg').onclick=()=>{ const s=shareText(); if(s){ navigator.clipboard&&navigator.clipboard.writeText(s.text); window.open('https://www.messenger.com/','_blank'); alert('تم نسخ المكان ✓ الزقه في محادثة الماسنجر'); } };
 $('searchInput').oninput=e=>{searchTerm=e.target.value;render();};
 $('catClose').onclick=()=>$('catModal').classList.remove('open');
 $('addCat').onclick=addOrUpdateCat;
