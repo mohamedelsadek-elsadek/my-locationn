@@ -69,6 +69,7 @@
   .loc-btn{width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:11px; padding:12px; color:var(--text); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px}
   .loc-btn:active{border-color:var(--primary)}
   .loc-hint{font-size:12px; color:var(--muted); margin-top:6px; text-align:center}
+  .open-link-btn{margin-top:8px; background:var(--primary); color:#fff; border:none; border-radius:9px; padding:9px 14px; font-size:13px; font-family:inherit; cursor:pointer}
   .loc-ok{color:var(--ok)}
   .btns{display:flex; gap:10px; margin-top:18px}
   .btn{flex:1; padding:13px; border-radius:11px; border:none; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit}
@@ -80,6 +81,17 @@
   .detail-actions{display:flex; gap:10px; margin-top:6px}
   .detail-meta{font-size:14px; color:var(--muted); line-height:1.7; margin-bottom:10px}
   .detail-desc{font-size:15px; line-height:1.8; margin-bottom:14px; white-space:pre-wrap}
+  .contact-row{display:flex; gap:6px; margin-bottom:7px; align-items:center}
+  .contact-row select{flex:0 0 38%; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:9px; color:var(--text); font-size:13px; font-family:inherit}
+  .contact-row input{flex:1; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:9px; color:var(--text); font-size:14px; font-family:inherit}
+  .contact-row .del{flex:0 0 34px; height:36px; background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--danger); cursor:pointer}
+  .dcontacts{margin-bottom:14px}
+  .dc-item{display:flex; align-items:center; gap:10px; background:var(--panel2); border:1px solid var(--line); border-radius:11px; padding:11px 13px; margin-bottom:7px; text-decoration:none; color:var(--text)}
+  .dc-item .dc-ico{font-size:18px; flex-shrink:0}
+  .dc-item .dc-body{flex:1; min-width:0}
+  .dc-item .dc-type{font-size:11px; color:var(--muted)}
+  .dc-item .dc-val{font-size:14px; word-break:break-all}
+  .dc-item .dc-copy{flex-shrink:0; font-size:12px; color:var(--primary); background:var(--primary-dim); padding:5px 10px; border-radius:8px; border:none; cursor:pointer; font-family:inherit}
   .sync-dot{position:absolute; top:18px; left:64px; z-index:1001; font-size:11px; color:var(--muted); background:var(--panel); padding:3px 9px; border-radius:8px; border:1px solid var(--line); display:none}
 
   /* إدارة التصنيفات */
@@ -152,6 +164,11 @@
     <div class="field"><label>التصنيف</label><select id="fCat"></select></div>
     <div class="field"><label>الوصف</label><textarea id="fDesc" placeholder="تفاصيل عن المكان…"></textarea></div>
     <div class="field">
+      <label>📞 وسائل التواصل والدفع</label>
+      <div id="contactsBox"></div>
+      <button class="loc-btn" id="addContact" style="margin-top:4px">➕ إضافة وسيلة (تليفون / محفظة / إنستا / حساب بنكي…)</button>
+    </div>
+    <div class="field">
       <label>📲 الصق لينك جوجل مابس (من الواتساب)</label>
       <input id="fLink" placeholder="الصق اللينك هنا وسيُستخرج الموقع تلقائيًا">
       <div class="loc-hint" id="linkHint" style="text-align:right"></div>
@@ -175,6 +192,7 @@
     <h2><span id="dName"></span><span class="x-btn" id="dClose">✕</span></h2>
     <div class="detail-meta" id="dMeta"></div>
     <div class="detail-desc" id="dDesc"></div>
+    <div class="dcontacts" id="dContacts"></div>
     <div class="detail-actions">
       <button class="btn btn-primary" id="dRoute">🧭 الاتجاهات</button>
       <button class="btn btn-ghost" id="dShare">📤 مشاركة</button>
@@ -475,14 +493,65 @@ function removeCat(id){
   persistCats(); renderCatList(); renderCats(); fillCatSelect(); render();
 }
 
+/* ---------- وسائل التواصل والدفع ---------- */
+const CONTACT_TYPES=[
+  {id:'phone',  name:'تليفون',      ico:'📞'},
+  {id:'whatsapp',name:'واتساب',     ico:'💬'},
+  {id:'wallet', name:'محفظة إلكترونية',ico:'💰'},
+  {id:'instapay',name:'إنستا باي',   ico:'⚡'},
+  {id:'instagram',name:'إنستجرام',   ico:'📷'},
+  {id:'facebook',name:'فيسبوك',     ico:'👍'},
+  {id:'bank',   name:'حساب بنكي',    ico:'🏦'},
+  {id:'iban',   name:'IBAN',         ico:'🏦'},
+  {id:'link',   name:'رابط',         ico:'🔗'},
+  {id:'other',  name:'أخرى',         ico:'📝'},
+];
+const cTypeById=id=>CONTACT_TYPES.find(t=>t.id===id)||CONTACT_TYPES[CONTACT_TYPES.length-1];
+
+function addContactRow(type,value){
+  const box=$('contactsBox');
+  const row=document.createElement('div'); row.className='contact-row';
+  const sel=document.createElement('select');
+  sel.innerHTML=CONTACT_TYPES.map(t=>`<option value="${t.id}">${t.ico} ${t.name}</option>`).join('');
+  if(type)sel.value=type;
+  const inp=document.createElement('input'); inp.placeholder='الرقم / الرابط / البيانات'; inp.value=value||'';
+  const del=document.createElement('button'); del.className='del'; del.textContent='✕'; del.type='button';
+  del.onclick=()=>row.remove();
+  row.append(sel,inp,del); box.appendChild(row);
+}
+function readContacts(){
+  return [...$('contactsBox').querySelectorAll('.contact-row')].map(r=>({
+    type:r.querySelector('select').value,
+    value:r.querySelector('input').value.trim()
+  })).filter(c=>c.value);
+}
+function loadContacts(arr){
+  $('contactsBox').innerHTML='';
+  (arr||[]).forEach(c=>addContactRow(c.type,c.value));
+}
+
+/* يبني رابط قابل للضغط حسب النوع */
+function contactHref(c){
+  const v=c.value.trim();
+  switch(c.type){
+    case 'phone': return 'tel:'+v.replace(/\s/g,'');
+    case 'whatsapp': return 'https://wa.me/'+v.replace(/[^\d]/g,'');
+    case 'instagram': return v.startsWith('http')?v:'https://instagram.com/'+v.replace('@','');
+    case 'facebook': return v.startsWith('http')?v:'https://facebook.com/'+v;
+    case 'instapay': return v.startsWith('http')?v:null;
+    case 'link': return v.startsWith('http')?v:'https://'+v;
+    default: return null;
+  }
+}
+
 /* ---------- نموذج المكان ---------- */
 function openForm(id){
   editingId=id||null;
   $('formTitle').textContent=id?'تعديل مكان':'إضافة مكان';
   $('locHint').innerHTML='أو اضغط على الخريطة لتحديد الموقع يدويًا';
   $('fLink').value=''; $('linkHint').textContent='';
-  if(id){const p=places.find(x=>x.id===id);$('fName').value=p.name;$('fCat').value=p.cat;$('fDesc').value=p.desc||'';$('fLat').value=p.lat??'';$('fLng').value=p.lng??'';}
-  else {$('fName').value='';$('fCat').value=categories[0]?.id||'';$('fDesc').value='';$('fLat').value='';$('fLng').value='';}
+  if(id){const p=places.find(x=>x.id===id);$('fName').value=p.name;$('fCat').value=p.cat;$('fDesc').value=p.desc||'';$('fLat').value=p.lat??'';$('fLng').value=p.lng??''; loadContacts(p.contacts);}
+  else {$('fName').value='';$('fCat').value=categories[0]?.id||'';$('fDesc').value='';$('fLat').value='';$('fLng').value=''; loadContacts([]);}
   $('formModal').classList.add('open'); closeSheetFn();
 }
 function closeForm(){$('formModal').classList.remove('open');}
@@ -492,7 +561,7 @@ function saveForm(){
   if(isNaN(lat)||isNaN(lng)){alert('حدد الموقع (GPS أو من الخريطة أو يدوي)');return;}
   let cat=$('fCat').value;
   if(!cat) cat=(categories[0]&&categories[0].id)||'other'; // احتياطي لو فاضي
-  const p={name,cat,desc:$('fDesc').value.trim(),lat,lng,updated:Date.now()};
+  const p={name,cat,desc:$('fDesc').value.trim(),lat,lng,contacts:readContacts(),updated:Date.now()};
   if(editingId)p.id=editingId;
   try{
     savePlace(p);
@@ -510,7 +579,33 @@ function openDetail(id){
   $('dName').textContent=p.name;
   $('dMeta').innerHTML=`${c.emoji} ${esc(c.name)} &nbsp;·&nbsp; ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
   $('dDesc').textContent=p.desc||'لا يوجد وصف';
+  // وسائل التواصل والدفع
+  const dc=$('dContacts');
+  const cs=p.contacts||[];
+  if(!cs.length){ dc.innerHTML=''; }
+  else {
+    dc.innerHTML=cs.map((c,i)=>{
+      const t=cTypeById(c.type);
+      const href=contactHref(c);
+      const inner=`<span class="dc-ico">${t.ico}</span><div class="dc-body"><div class="dc-type">${t.name}</div><div class="dc-val">${esc(c.value)}</div></div><button class="dc-copy" onclick="event.preventDefault();event.stopPropagation();copyContact(${i})">نسخ</button>`;
+      return href
+        ? `<a class="dc-item" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>`
+        : `<div class="dc-item">${inner}</div>`;
+    }).join('');
+  }
   $('detailModal').classList.add('open');
+}
+function copyContact(i){
+  const p=places.find(x=>x.id===detailId); if(!p||!p.contacts)return;
+  const v=p.contacts[i].value;
+  if(navigator.clipboard) navigator.clipboard.writeText(v).then(()=>toast('تم النسخ ✓')).catch(()=>prompt('انسخ:',v));
+  else prompt('انسخ:',v);
+}
+function toast(msg){
+  let t=document.getElementById('_toast');
+  if(!t){t=document.createElement('div');t.id='_toast';t.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 18px;border-radius:20px;z-index:3000;font-size:14px;transition:opacity .3s';document.body.appendChild(t);}
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity='0',1500);
 }
 
 /* ---------- استخراج الموقع من لينك جوجل مابس ---------- */
@@ -520,8 +615,9 @@ function parseMapLink(url){
   // أنماط شائعة لإحداثيات جوجل مابس
   const patterns=[
     /@(-?\d+\.\d+),(-?\d+\.\d+)/,                 // .../@30.594,31.487,15z
-    /[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,          // ...?q=30.594,31.487
+    /[?&]q=(?:loc:)?(-?\d+\.\d+),\s*(-?\d+\.\d+)/, // ...?q=30.594,31.487 أو q=loc:..
     /[?&]ll=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,         // ...?ll=30.594,31.487
+    /[?&]query=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,      // ...?query=30.594,31.487
     /[?&]daddr=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,      // اتجاهات
     /destination=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,    // dir destination
     /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,              // صيغة المكان الداخلية
@@ -537,16 +633,17 @@ function parseMapLink(url){
   return null;
 }
 function handleLinkInput(){
-  const v=$('fLink').value;
+  const v=$('fLink').value.trim();
   const hint=$('linkHint');
-  if(!v.trim()){ hint.textContent=''; return; }
+  if(!v){ hint.textContent=''; return; }
   const r=parseMapLink(v);
   if(r){
     $('fLat').value=r.lat.toFixed(6); $('fLng').value=r.lng.toFixed(6);
     hint.innerHTML='<span class="loc-ok">✓ تم استخراج الموقع من اللينك</span>';
     $('locHint').innerHTML='<span class="loc-ok">✓ الموقع جاهز من لينك جوجل مابس</span>';
-  } else if(/goo\.gl|app\.goo\.gl/.test(v)){
-    hint.innerHTML='⚠️ اللينك مختصر. افتحه في جوجل مابس وانسخ اللينك الكامل (اللي فيه أرقام)، أو انسخ الإحداثيات يدويًا.';
+  } else if(/goo\.gl|app\.goo\.gl|maps\.apple/.test(v)){
+    hint.innerHTML=`اللينك مختصر — افتحه وانسخ الرابط الكامل اللي فيه الأرقام والزقه هنا:
+      <br><button type="button" class="open-link-btn" onclick="window.open('${encodeURI(v)}','_blank')">🔗 افتح الرابط في جوجل مابس</button>`;
   } else {
     hint.innerHTML='لم أجد إحداثيات في اللينك. تأكد إنه لينك جوجل مابس فيه موقع.';
   }
@@ -585,6 +682,7 @@ function closeAll(){document.querySelectorAll('.modal').forEach(m=>m.classList.r
 $('addBtn').onclick=()=>openForm();
 $('cancelForm').onclick=closeForm; $('cancelForm2').onclick=closeForm; $('saveForm').onclick=saveForm;
 $('useGps').onclick=useGps; $('locateBtn').onclick=locateMe;
+$('addContact').onclick=()=>addContactRow();
 $('fLink').oninput=handleLinkInput;
 $('fLink').onpaste=()=>setTimeout(handleLinkInput,50);
 $('listToggle').onclick=openSheetFn; $('closeSheet').onclick=closeSheetFn;
@@ -601,6 +699,10 @@ function shareText(){
   let t=`📍 ${p.name}`;
   t+=`\n${c.emoji} ${c.name}`;
   if(p.desc) t+=`\n${p.desc}`;
+  if(p.contacts&&p.contacts.length){
+    t+='\n';
+    p.contacts.forEach(ct=>{ const tt=cTypeById(ct.type); t+=`\n${tt.ico} ${tt.name}: ${ct.value}`; });
+  }
   t+=`\n\n${link}`;
   return {text:t, name:p.name};
 }
